@@ -1,0 +1,23 @@
+{
+  "phones": [
+    {
+      "id": "2",
+      "name": "John Doe",
+      "sect": "TCT",
+      "tel": "084-965-4528"
+    },
+    {
+      "id": "3",
+      "name": "Eric Johnson",
+      "sect": "TCT",
+      "tel": "02-304-6942"
+    },
+    {
+      "id": "4",
+      "name": "Nene Royal",
+      "sect": "CED",
+      "tel": "087-985-3542"
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
