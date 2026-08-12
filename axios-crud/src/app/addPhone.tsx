@@ -1,0 +1,154 @@
+import api from '@/utils/crud-api';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { v4 as uuidv4 } from 'uuid';
+import { FormActions, SectionPicker, TextField } from '../components/form-controls';
+import { colors, spacing, typography } from '../theme';
+
+type Errors = {
+    name?: string;
+    sect?: string;
+    tel?: string;
+};
+
+export default function AddPhone() {
+    const router = useRouter();
+    const [name, setName] = useState('');
+    const [sect, setSect] = useState('');
+    const [tel, setTel] = useState('');
+    const [errors, setErrors] = useState<Errors>({});
+    const [saving, setSaving] = useState(false);
+
+    const validate = () => {
+        const next: Errors = {};
+        if (name.trim() === '') next.name = 'Name is required';
+        if (sect === '') next.sect = 'Please choose a section';
+        if (tel.trim() === '') next.tel = 'Phone number is required';
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
+
+    const addPhone = async () => {
+        if (!validate()) return;
+
+        setSaving(true);
+        try {
+            await api.post('phones', {
+                id: uuidv4(),
+                name: name.trim(),
+                sect,
+                tel: tel.trim(),
+            });
+            setName(''); setSect(''); setTel('');
+            router.navigate('/');
+        } catch (err) {
+            console.log(err);
+            Alert.alert('Save failed', 'Could not add this contact. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Add New Phone</Text>
+                        <Text style={styles.subtitle}>
+                            Fill in the details below to create a contact.
+                        </Text>
+                    </View>
+
+                    <View style={styles.card}>
+                        <TextField
+                            label="Name"
+                            value={name}
+                            onChangeText={(text) => {
+                                setName(text);
+                                if (errors.name) setErrors((e) => ({ ...e, name: undefined }));
+                            }}
+                            placeholder="e.g. John Doe"
+                            error={errors.name}
+                            autoCapitalize="words"
+                        />
+
+                        <SectionPicker
+                            value={sect}
+                            onChange={(value) => {
+                                setSect(value);
+                                if (errors.sect) setErrors((e) => ({ ...e, sect: undefined }));
+                            }}
+                            error={errors.sect}
+                        />
+
+                        <TextField
+                            label="Phone number"
+                            value={tel}
+                            onChangeText={(text) => {
+                                setTel(text);
+                                if (errors.tel) setErrors((e) => ({ ...e, tel: undefined }));
+                            }}
+                            placeholder="e.g. 084-965-4528"
+                            error={errors.tel}
+                            keyboardType="phone-pad"
+                        />
+                    </View>
+                </ScrollView>
+
+                <FormActions
+                    onCancel={() => router.back()}
+                    onSubmit={addPhone}
+                    submitLabel="Add Phone"
+                    submitting={saving}
+                />
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    safe: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    flex: {
+        flex: 1,
+    },
+    content: {
+        padding: spacing.lg,
+        paddingBottom: spacing.xxl,
+    },
+    header: {
+        gap: spacing.xs,
+        marginBottom: spacing.xl,
+    },
+    title: {
+        ...typography.title,
+        color: colors.text,
+    },
+    subtitle: {
+        ...typography.caption,
+        color: colors.textMuted,
+    },
+    card: {
+        gap: spacing.lg,
+    },
+});
