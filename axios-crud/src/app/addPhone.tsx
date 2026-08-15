@@ -1,6 +1,6 @@
 import api from '@/utils/crud-api';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { v4 as uuidv4 } from 'uuid';
 import { FormActions, SectionPicker, TextField } from '../components/form-controls';
-import { colors, spacing, typography } from '../theme';
+import { spacing, ThemeColors, typography, useTheme } from '../theme';
 
 type Errors = {
     name?: string;
@@ -22,6 +22,8 @@ type Errors = {
 };
 
 export default function AddPhone() {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const router = useRouter();
     const [name, setName] = useState('');
     const [sect, setSect] = useState('');
@@ -124,7 +126,8 @@ export default function AddPhone() {
     );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+    return StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: colors.background,
@@ -151,4 +154,5 @@ const styles = StyleSheet.create({
     card: {
         gap: spacing.lg,
     },
-});
+    });
+}

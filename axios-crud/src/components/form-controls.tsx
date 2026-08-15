@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   KeyboardTypeOptions,
@@ -8,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { colors, radius, spacing, TOUCH_MIN, typography } from "../theme";
+import { radius, spacing, ThemeColors, TOUCH_MIN, typography, useTheme } from "../theme";
 
 /** Labelled text input with the error message anchored to the field. */
 export function TextField({
@@ -28,6 +29,9 @@ export function TextField({
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: "none" | "words" | "sentences" | "characters";
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -51,6 +55,45 @@ export function TextField({
   );
 }
 
+/** Icon-prefixed search box with a clear button — distinct from TextField, which always shows a label. */
+export function SearchField({
+  value,
+  onChangeText,
+  placeholder = "Search",
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  return (
+    <View style={styles.searchWrap}>
+      <MaterialCommunityIcons name="magnify" size={18} color={colors.textMuted} />
+      <TextInput
+        style={styles.searchInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        autoCapitalize="none"
+        accessibilityLabel={placeholder}
+      />
+      {value.length > 0 && (
+        <Pressable
+          onPress={() => onChangeText("")}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+        >
+          <MaterialCommunityIcons name="close-circle" size={18} color={colors.textMuted} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 const SECTIONS = ["CED", "TCT"] as const;
 
 /** Segmented choice — larger tap area and clearer state than a radio row. */
@@ -63,6 +106,9 @@ export function SectionPicker({
   onChange: (value: string) => void;
   error?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>Section</Text>
@@ -99,6 +145,47 @@ export function SectionPicker({
   );
 }
 
+const FILTER_OPTIONS = ["All", ...SECTIONS] as const;
+export type SectionFilterValue = (typeof FILTER_OPTIONS)[number];
+
+/** Segmented filter — same tap ergonomics as SectionPicker, but non-exclusive (has an "All" state). */
+export function SectionFilter({
+  value,
+  onChange,
+}: {
+  value: SectionFilterValue;
+  onChange: (value: SectionFilterValue) => void;
+}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  return (
+    <View style={styles.segment}>
+      {FILTER_OPTIONS.map((option) => {
+        const selected = value === option;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onChange(option)}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`Filter ${option}`}
+            style={({ pressed }) => [
+              styles.segmentItem,
+              selected && styles.segmentItemActive,
+              pressed && !selected && styles.segmentItemPressed,
+            ]}
+          >
+            <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /** Sticky action bar: primary action on the right, following platform convention. */
 export function FormActions({
   onCancel,
@@ -111,6 +198,9 @@ export function FormActions({
   submitLabel: string;
   submitting?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.actions}>
       <Pressable
@@ -151,7 +241,8 @@ export function FormActions({
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   field: {
     gap: spacing.sm,
   },
@@ -181,6 +272,23 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.danger,
   },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minHeight: TOUCH_MIN,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    color: colors.text,
+    ...typography.body,
+  },
   segment: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -192,7 +300,7 @@ const styles = StyleSheet.create({
   },
   segmentItem: {
     flex: 1,
-    minHeight: TOUCH_MIN - spacing.sm,
+    minHeight: TOUCH_MIN,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.sm - 2,
@@ -252,4 +360,5 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.6,
   },
-});
+  });
+}

@@ -1,7 +1,8 @@
 import Card from "@/components/card";
 import api from "@/utils/crud-api";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,9 +12,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, radius, shadow, spacing, TOUCH_MIN, typography } from "../theme";
+import { SearchField, SectionFilter, SectionFilterValue } from "../components/form-controls";
+import { radius, shadow, spacing, ThemeColors, TOUCH_MIN, typography, useTheme } from "../theme";
+import { useThemeMode } from "../theme-context";
 
 type Phone = {
   id: string;
@@ -23,10 +25,15 @@ type Phone = {
 };
 
 export default function Index() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { mode, toggleMode } = useThemeMode();
   const [data, setData] = useState<Phone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sectionFilter, setSectionFilter] = useState<SectionFilterValue>("All");
 
   const getData = useCallback(async () => {
     try {
@@ -55,24 +62,54 @@ export default function Index() {
     getData();
   };
 
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return data.filter((phone) => {
+      const matchesSection = sectionFilter === "All" || phone.sect === sectionFilter;
+      const matchesQuery =
+        normalizedQuery === "" ||
+        phone.name.toLowerCase().includes(normalizedQuery) ||
+        phone.tel.includes(normalizedQuery);
+      return matchesSection && matchesQuery;
+    });
+  }, [data, query, sectionFilter]);
+
+  const hasActiveFilters = query.trim() !== "" || sectionFilter !== "All";
+
   const renderEmpty = () => {
     if (loading) return null;
+
+    if (error) {
+      return (
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <MaterialCommunityIcons name="wifi-off" size={32} color={colors.textMuted} />
+          </View>
+          <Text style={styles.emptyTitle}>Can&apos;t reach the server</Text>
+          <Text style={styles.emptyText}>{error}</Text>
+        </View>
+      );
+    }
+
+    if (hasActiveFilters) {
+      return (
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <MaterialCommunityIcons name="account-search-outline" size={32} color={colors.textMuted} />
+          </View>
+          <Text style={styles.emptyTitle}>No matches</Text>
+          <Text style={styles.emptyText}>Try a different name, number, or section.</Text>
+        </View>
+      );
+    }
 
     return (
       <View style={styles.empty}>
         <View style={styles.emptyIcon}>
-          <Icon
-            source={error ? "wifi-off" : "account-multiple-outline"}
-            size={32}
-            color={colors.textMuted}
-          />
+          <MaterialCommunityIcons name="account-multiple-outline" size={32} color={colors.textMuted} />
         </View>
-        <Text style={styles.emptyTitle}>
-          {error ? "Can't reach the server" : "No contacts yet"}
-        </Text>
-        <Text style={styles.emptyText}>
-          {error ?? "Add your first contact to get started."}
-        </Text>
+        <Text style={styles.emptyTitle}>No contacts yet</Text>
+        <Text style={styles.emptyText}>Add your first contact to get started.</Text>
       </View>
     );
   };
@@ -85,20 +122,43 @@ export default function Index() {
           <Text style={styles.subtitle}>
             {loading
               ? "Loading…"
-              : `${data.length} ${data.length === 1 ? "contact" : "contacts"}`}
+              : `${filtered.length} ${filtered.length === 1 ? "contact" : "contacts"}`}
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => router.push("/addPhone")}
-          accessibilityRole="button"
-          accessibilityLabel="Add phone"
-          style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
-        >
-          <Icon source="plus" size={20} color={colors.onPrimary} />
-          <Text style={styles.addBtnText}>Add</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={toggleMode}
+            accessibilityRole="button"
+            accessibilityLabel={mode === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            hitSlop={6}
+            style={({ pressed }) => [styles.themeBtn, pressed && styles.themeBtnPressed]}
+          >
+            <MaterialCommunityIcons
+              name={mode === "dark" ? "weather-sunny" : "weather-night"}
+              size={20}
+              color={colors.text}
+            />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/addPhone")}
+            accessibilityRole="button"
+            accessibilityLabel="Add phone"
+            style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color={colors.onPrimary} />
+            <Text style={styles.addBtnText}>Add</Text>
+          </Pressable>
+        </View>
       </View>
+
+      {!loading && data.length > 0 && (
+        <View style={styles.filters}>
+          <SearchField value={query} onChangeText={setQuery} placeholder="Search name or number" />
+          <SectionFilter value={sectionFilter} onChange={setSectionFilter} />
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.loading}>
@@ -106,12 +166,12 @@ export default function Index() {
         </View>
       ) : (
         <FlatList
-          data={data}
+          data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <Card phone={item} refresh={getData} />}
           contentContainerStyle={[
             styles.listContent,
-            data.length === 0 && styles.listContentEmpty,
+            filtered.length === 0 && styles.listContentEmpty,
           ]}
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
@@ -129,7 +189,8 @@ export default function Index() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -155,6 +216,24 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  themeBtn: {
+    width: TOUCH_MIN,
+    height: TOUCH_MIN,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  themeBtnPressed: {
+    backgroundColor: colors.surfacePressed,
+  },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -171,6 +250,11 @@ const styles = StyleSheet.create({
   addBtnText: {
     ...typography.label,
     color: colors.onPrimary,
+  },
+  filters: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   loading: {
     flex: 1,
@@ -211,4 +295,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
   },
-});
+  });
+}

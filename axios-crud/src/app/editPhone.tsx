@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormActions, SectionPicker, TextField } from '../components/form-controls';
-import { colors, spacing, typography } from '../theme';
+import { spacing, ThemeColors, typography, useTheme } from '../theme';
 import api from '../utils/crud-api';
 
 type Errors = {
@@ -27,6 +27,8 @@ const EditPhone = () => {
         sect: string;
         tel: string;
     }>();
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const [newName, setNewName] = useState(name);
     const [newSect, setNewSect] = useState(sect);
     const [newTel, setNewTel] = useState(tel);
@@ -129,7 +131,8 @@ const EditPhone = () => {
 
 export default EditPhone;
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+    return StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: colors.background,
@@ -156,4 +159,5 @@ const styles = StyleSheet.create({
     card: {
         gap: spacing.lg,
     },
-});
+    });
+}

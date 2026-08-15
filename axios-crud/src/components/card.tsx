@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, shadow, spacing, TOUCH_MIN, typography } from "../theme";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { radius, shadow, spacing, ThemeColors, TOUCH_MIN, typography, useTheme } from "../theme";
 import api from "../utils/crud-api";
+import ConfirmDialog from "./confirm-dialog";
 
 type Phone = {
   id: string;
@@ -18,7 +19,7 @@ type Props = {
 };
 
 /** Initials avatar — gives each row a stable visual anchor. */
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, styles }: { name: string; styles: Styles }) {
   const initials = name
     .trim()
     .split(/\s+/)
@@ -34,9 +35,25 @@ function Avatar({ name }: { name: string }) {
 }
 
 export default function Card({ phone, refresh }: Props) {
+  const { colors, getSectionColors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const sectionColors = getSectionColors(phone.sect);
   const [deleting, setDeleting] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  const callPhone = async () => {
+    // Strip formatting — some dialers reject "tel:" URLs containing dashes/spaces.
+    const url = `tel:${phone.tel.replace(/[^\d+]/g, "")}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert("Can't place call", "This device has no phone app available.");
+      return;
+    }
+    Linking.openURL(url);
+  };
 
   const delPhone = async () => {
+    setConfirmVisible(false);
     setDeleting(true);
     try {
       await api.delete("phones/" + phone.id);
@@ -49,22 +66,9 @@ export default function Card({ phone, refresh }: Props) {
     }
   };
 
-  // Destructive actions need confirmation before they run.
-  const confirmDelete = () => {
-    Alert.alert(
-      "Delete contact?",
-      `"${phone.name}" will be permanently removed.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: delPhone },
-      ],
-      { cancelable: true }
-    );
-  };
-
   return (
     <View style={styles.card}>
-      <Avatar name={phone.name} />
+      <Avatar name={phone.name} styles={styles} />
 
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
@@ -72,12 +76,21 @@ export default function Card({ phone, refresh }: Props) {
         </Text>
 
         <View style={styles.metaRow}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{phone.sect}</Text>
+          <View style={[styles.badge, { backgroundColor: sectionColors.bg }]}>
+            <Text style={[styles.badgeText, { color: sectionColors.text }]}>{phone.sect}</Text>
           </View>
-          <Text style={styles.tel} numberOfLines={1}>
-            {phone.tel}
-          </Text>
+          <Pressable
+            onPress={callPhone}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Call ${phone.name}`}
+            style={({ pressed }) => [styles.telRow, pressed && styles.telRowPressed]}
+          >
+            <MaterialCommunityIcons name="phone-outline" size={13} color={colors.primary} />
+            <Text style={styles.tel} numberOfLines={1}>
+              {phone.tel}
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -94,6 +107,9 @@ export default function Card({ phone, refresh }: Props) {
           }}
           push
           asChild
+          // The anchor Link renders on web shrinks to its content, which would
+          // drop the button below the 44pt minimum touch target.
+          style={styles.linkReset}
         >
           <Pressable
             accessibilityRole="button"
@@ -106,7 +122,7 @@ export default function Card({ phone, refresh }: Props) {
         </Link>
 
         <Pressable
-          onPress={confirmDelete}
+          onPress={() => setConfirmVisible(true)}
           disabled={deleting}
           accessibilityRole="button"
           accessibilityLabel={`Delete ${phone.name}`}
@@ -126,11 +142,21 @@ export default function Card({ phone, refresh }: Props) {
           )}
         </Pressable>
       </View>
+
+      <ConfirmDialog
+        visible={confirmVisible}
+        title="Delete contact?"
+        message={`"${phone.name}" will be permanently removed.`}
+        confirmLabel="Delete"
+        onConfirm={delPhone}
+        onCancel={() => setConfirmVisible(false)}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -180,14 +206,28 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.badgeText,
   },
+  telRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+    paddingVertical: spacing.xs,
+  },
+  telRowPressed: {
+    opacity: 0.6,
+  },
   tel: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: colors.primary,
     flexShrink: 1,
   },
   actions: {
     flexDirection: "row",
     gap: spacing.sm,
+  },
+  linkReset: {
+    width: TOUCH_MIN,
+    height: TOUCH_MIN,
   },
   iconBtn: {
     width: TOUCH_MIN,
@@ -209,4 +249,7 @@ const styles = StyleSheet.create({
   iconBtnDisabled: {
     opacity: 0.5,
   },
-});
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;
